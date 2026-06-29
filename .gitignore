@@ -83,4 +83,4 @@ handoff.md
 .claude/
 api-relate/
 # Generated report workbooks (keep the folder, not the artifacts)
-export/*.xlsx
+export/

@@ -342,8 +342,11 @@ td.actions button { padding: 0.3rem 0.6rem; margin-left: 0.4rem; }
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0.75rem 1rem;
-  min-width: 150px;
-  max-width: 195px;
+  width: 200px;
+  height: 175px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 .exec-card-n   { font-size: 1.65rem; font-weight: 800; color: var(--err); line-height: 1; }
 .exec-card-sub { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-top: 1px; }

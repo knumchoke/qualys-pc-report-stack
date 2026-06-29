@@ -132,33 +132,41 @@ function buildCritBars(criticality) {
     .join("");
 }
 
-// ── HIGH findings cards ───────────────────────────────────────────────────────
+// ── Prioritization tier slides ────────────────────────────────────────────────
 
-function buildFindings(highFindings) {
-  const { total, items } = highFindings;
-  if (items.length === 0) {
-    return '<p class="muted">No HIGH criticality failures.</p>';
-  }
+function buildTierSlide(tier) {
+  const { label, value, total, items } = tier;
+  const col = CRIT_COLOR[label] || "#94a3b8";
 
-  let html = "";
+  let cards = "";
   items.forEach((item, i) => {
-    html += `<div class="exec-card">
+    cards += `<div class="exec-card">
       <div class="exec-card-n">${item.count}</div>
       <div class="exec-card-sub">Finding</div>
       <div class="exec-card-txt">${esc(item.control)}</div>
     </div>`;
     if (i < items.length - 1) {
-      html += '<div class="exec-arrow" aria-hidden="true">→</div>';
+      cards += '<div class="exec-arrow" aria-hidden="true">→</div>';
     }
   });
 
-  html += `<div class="exec-arrow" aria-hidden="true">→</div>
+  cards += `<div class="exec-arrow" aria-hidden="true">→</div>
     <div class="exec-total-badge">
       <div class="exec-total-n">${total}</div>
       <div class="exec-total-sub">Finding</div>
     </div>`;
 
-  return html;
+  return `<section class="exec-slide exec-slide-b">
+    <div class="exec-slide-b-hdr">
+      Prioritization &mdash; <span style="background:${col};color:#0a1929;padding:0.15rem 0.5rem;border-radius:5px;font-size:0.95rem">${esc(label)}</span> Criticality
+    </div>
+    <div class="exec-findings">${cards}</div>
+  </section>`;
+}
+
+function buildPrioritizationSlides(prioritization) {
+  const slides = prioritization.filter((t) => t.items.length > 0).map(buildTierSlide);
+  return slides.length ? slides.join("") : '<section class="exec-slide exec-slide-b"><p class="muted">No failures recorded.</p></section>';
 }
 
 // ── Main load ─────────────────────────────────────────────────────────────────
@@ -177,7 +185,7 @@ async function load() {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || `HTTP ${res.status}`);
     }
-    const { report, overall, sections, criticality, highFindings } = await res.json();
+    const { report, overall, sections, criticality, prioritization } = await res.json();
 
     $("backLink").href = `/compliance-report.html?id=${reportId}`;
     document.title = `Executive Report — ${report.title || report.os}`;
@@ -210,17 +218,14 @@ async function load() {
     // Criticality bars
     $("critBars").innerHTML = buildCritBars(criticality);
 
-    // Slide B header
-    $("slideBHeader").innerHTML = `
-      Prioritization &mdash; <span class="high-tag">HIGH</span> Criticality`;
+    // Prioritization slides (one per criticality tier, high→low)
+    const prioEl = $("prioritizationSlides");
+    prioEl.innerHTML = buildPrioritizationSlides(prioritization || []);
+    prioEl.hidden = false;
 
-    // Findings
-    $("findings").innerHTML = buildFindings(highFindings);
-
-    // Reveal slides
+    // Reveal Slide A
     $("execLoading").hidden = true;
     $("slideA").hidden = false;
-    $("slideB").hidden = false;
   } catch (err) {
     $("execLoading").hidden = true;
     $("execError").textContent = "Error: " + err.message;

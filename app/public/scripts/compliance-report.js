@@ -67,13 +67,42 @@ async function loadReport() {
       fbc.map((c) => `<span class="chip">${esc(c.label || "—")} <b>${esc(c.count)}</b></span>`).join("")
     : "";
 
-  // Populate the results criticality filter (labels ordered by severity desc).
+  // Populate criticality filters (results + findings) from the same label list.
+  const labels = r.criticalityLabels || [];
+  const optionsHtml = labels.map((l) => `<option value="${esc(l)}">${esc(l)}</option>`).join("");
+
   const sel = $("criticality");
   const current = sel.value;
-  sel.innerHTML =
-    '<option value="">All criticality</option>' +
-    (r.criticalityLabels || []).map((l) => `<option value="${esc(l)}">${esc(l)}</option>`).join("");
+  sel.innerHTML = '<option value="">All criticality</option>' + optionsHtml;
   sel.value = current;
+
+  const fsel = $("findingCriticality");
+  const fcurrent = fsel.value;
+  fsel.innerHTML = '<option value="">All criticality</option>' + optionsHtml;
+  fsel.value = fcurrent;
+}
+
+async function loadFindings() {
+  const criticality = $("findingCriticality").value;
+  const params = new URLSearchParams({ criticality });
+  const res = await fetch(`/api/compliance-reports/${reportId}/findings-by-control?` + params.toString());
+  if (!res.ok) return;
+  const json = await res.json();
+  const data = json.data || [];
+
+  $("findingRows").innerHTML = data.length
+    ? data
+        .map(
+          (r) => `
+      <tr>
+        <td>${esc(r.controlId ?? "—")}</td>
+        <td>${esc(r.control || "—")}</td>
+        <td class="muted">${esc(r.criticalityLabel || "—")}</td>
+        <td><b>${Number(r.count).toLocaleString()}</b></td>
+      </tr>`,
+        )
+        .join("")
+    : '<tr><td class="empty" colspan="4">No findings.</td></tr>';
 }
 
 async function loadHosts() {
@@ -193,6 +222,9 @@ $("hostPageSize").addEventListener("change", () => { hostPage = 1; loadHosts(); 
 $("hostPrev").addEventListener("click", () => { if (hostPage > 1) { hostPage--; loadHosts(); } });
 $("hostNext").addEventListener("click", () => { hostPage++; loadHosts(); });
 
+$("findingCriticality").addEventListener("change", () => loadFindings());
+
 loadReport();
+loadFindings();
 loadHosts();
 loadResults();

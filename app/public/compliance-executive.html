@@ -17,33 +17,37 @@
     <div id="execLoading" class="exec-msg">Loading…</div>
     <div id="execError" class="exec-msg exec-err" hidden></div>
 
-    <!-- ── Slide A: Compliance Scan ─────────────────────────────────────── -->
-    <section class="exec-slide" id="slideA" hidden>
-      <!-- Header band -->
-      <div class="exec-hdr" id="execHdr"></div>
+    <main>
+      <h1 id="pageTitle" class="sr-only">Executive Report</h1>
 
-      <!-- Two-panel body -->
-      <div class="exec-body">
-        <!-- Left: section stepped-area chart -->
-        <div class="exec-section-panel">
-          <div class="exec-panel-label">Section Heading</div>
-          <div class="exec-chart-outer">
-            <div class="exec-overall" id="execOverall"></div>
-            <div id="sectionSvgWrap"></div>
-            <div class="exec-sname-row" id="sectionNames"></div>
+      <!-- ── Slide A: Compliance Scan ─────────────────────────────────────── -->
+      <section class="exec-slide" id="slideA" hidden>
+        <!-- Header band -->
+        <div class="exec-hdr" id="execHdr"></div>
+
+        <!-- Two-panel body -->
+        <div class="exec-body">
+          <!-- Left: section stepped-area chart -->
+          <div class="exec-section-panel">
+            <div class="exec-panel-label">Section Heading</div>
+            <div class="exec-chart-outer">
+              <div class="exec-overall" id="execOverall"></div>
+              <div id="sectionSvgWrap"></div>
+              <div class="exec-sname-row" id="sectionNames"></div>
+            </div>
+          </div>
+
+          <!-- Right: criticality stacked bars -->
+          <div class="exec-crit-panel">
+            <div class="exec-panel-label">Control Criticality</div>
+            <div id="critBars"></div>
           </div>
         </div>
+      </section>
 
-        <!-- Right: criticality stacked bars -->
-        <div class="exec-crit-panel">
-          <div class="exec-panel-label">Control Criticality</div>
-          <div id="critBars"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ── Slide B+: Prioritization (one slide per criticality tier) ──────── -->
-    <div id="prioritizationSlides" hidden></div>
+      <!-- ── Slide B+: Prioritization (one slide per criticality tier) ──────── -->
+      <div id="prioritizationSlides" hidden></div>
+    </main>
 
     <script src="/scripts/nav.js"></script>
     <script src="/scripts/compliance-executive.js"></script>

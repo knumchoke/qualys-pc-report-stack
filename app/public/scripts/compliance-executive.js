@@ -86,7 +86,9 @@ function buildSectionSvg(sections) {
 
   const viewH = bottom + 4;
   return `<svg viewBox="0 0 660 ${viewH}" preserveAspectRatio="none"
+    role="img" aria-label="Section compliance chart — ${sections.length} sections"
     style="width:100%;display:block;border-radius:8px;overflow:hidden">
+    <title>Section compliance chart — ${sections.length} sections</title>
     <rect x="0" y="0" width="660" height="${viewH}" fill="#0a1929"/>
     ${grid}
     ${vdiv}
@@ -135,7 +137,7 @@ function buildCritBars(criticality) {
 // ── Prioritization tier slides ────────────────────────────────────────────────
 
 function buildTierSlide(tier) {
-  const { label, value, total, items } = tier;
+  const { label, total, items } = tier;
   const col = CRIT_COLOR[label] || "#94a3b8";
 
   let cards = "";
@@ -158,7 +160,7 @@ function buildTierSlide(tier) {
 
   return `<section class="exec-slide exec-slide-b">
     <div class="exec-slide-b-hdr">
-      Prioritization &mdash; <span style="background:${col};color:#0a1929;padding:0.15rem 0.5rem;border-radius:5px;font-size:0.95rem">${esc(label)}</span> Criticality
+      Prioritization &mdash; <span class="crit-tag" style="--crit-col:${col}">${esc(label)}</span> Criticality
     </div>
     <div class="exec-findings">${cards}</div>
   </section>`;
@@ -188,11 +190,13 @@ async function load() {
     const { report, overall, sections, criticality, prioritization } = await res.json();
 
     $("backLink").href = `/compliance-report.html?id=${reportId}`;
-    document.title = `Executive Report — ${report.title || report.os}`;
+    const reportLabel = report.title || report.os;
+    document.title = `Executive Report — ${reportLabel}`;
+    $("pageTitle").textContent = `Executive Report — ${reportLabel}`;
 
     // Header band
     $("execHdr").innerHTML = `
-      <span class="exec-hdr-n">${esc(String(report.serverCount))}</span>
+      <span class="exec-hdr-n">${esc(String(report.serverCount ?? "—"))}</span>
       <span class="exec-hdr-word">Server</span>
       <span class="exec-hdr-tag">+</span>
       <span class="exec-hdr-word">CIS</span>
@@ -207,13 +211,16 @@ async function load() {
       <div class="ov-fail">${overall.failedPct ?? "—"}%</div>
       <div class="ov-lbl">Failed</div>`;
 
-    // Section SVG
-    $("sectionSvgWrap").innerHTML = buildSectionSvg(sections);
-
-    // Section name labels (below SVG, one flex-cell per section)
-    $("sectionNames").innerHTML = sections
-      .map((s) => `<div class="exec-sname">${esc(s.sectionName)}</div>`)
-      .join("");
+    // Section SVG — guard against empty sections (OS mismatch / all-unmapped)
+    if (sections.length === 0) {
+      $("sectionSvgWrap").innerHTML = '<p class="muted" style="padding:1rem 0">No section mapping found for this OS.</p>';
+      $("sectionNames").innerHTML = "";
+    } else {
+      $("sectionSvgWrap").innerHTML = buildSectionSvg(sections);
+      $("sectionNames").innerHTML = sections
+        .map((s) => `<div class="exec-sname">${esc(s.sectionName)}</div>`)
+        .join("");
+    }
 
     // Criticality bars
     $("critBars").innerHTML = buildCritBars(criticality);

@@ -333,7 +333,7 @@ td.actions button { padding: 0.3rem 0.6rem; margin-left: 0.4rem; }
 /* Slide B */
 .exec-slide-b { background: #080f1d; }
 .exec-slide-b-hdr { font-size: 1.3rem; font-weight: 800; color: var(--text); margin-bottom: 1.25rem; }
-.high-tag { background: var(--err); color: #2a0a0a; padding: 0.15rem 0.5rem; border-radius: 5px; font-size: 0.95rem; }
+.crit-tag { background: var(--crit-col, #94a3b8); color: #0a1929; padding: 0.15rem 0.5rem; border-radius: 5px; font-size: 0.95rem; }
 
 .exec-findings { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 
@@ -366,10 +366,12 @@ td.actions button { padding: 0.3rem 0.6rem; margin-left: 0.4rem; }
 /* Utility */
 .exec-msg { text-align: center; padding: 3rem; color: var(--muted); font-size: 1rem; }
 .exec-err { color: var(--err); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
 /* Print */
 @media print {
   .no-print { display: none !important; }
-  .exec-slide { page-break-after: always; break-after: page; }
+  .exec-slide:not(:last-child) { page-break-after: always; break-after: page; }
+  .exec-card { height: auto; overflow: visible; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }

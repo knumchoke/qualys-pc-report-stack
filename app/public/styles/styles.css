@@ -244,6 +244,12 @@ td.actions button { padding: 0.3rem 0.6rem; margin-left: 0.4rem; }
 .crit-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.75rem; }
 .crit-chips .chip { background: var(--card); border: 1px solid var(--border); border-radius: 999px; padding: 0.2rem 0.7rem; font-size: 0.8rem; }
 .crit-chips .chip b { color: var(--err); margin-left: 0.15rem; }
+.asset-tags { display: flex; flex-wrap: wrap; gap: 0.4rem 0.5rem; align-items: center; margin-top: 0.6rem; }
+.asset-tags .at-group { display: contents; }
+.asset-tags .at-label { font-size: 0.72rem; color: var(--muted); white-space: nowrap; }
+.asset-chip { border-radius: 999px; padding: 0.18rem 0.65rem; font-size: 0.78rem; font-weight: 500; white-space: nowrap; }
+.asset-chip.include { background: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.35); color: #7dd3fc; }
+.asset-chip.exclude { background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.35); color: #fcd34d; }
 /* Long, space-less report filenames: wrap instead of stretching the table. */
 .filecell { max-width: 320px; overflow-wrap: anywhere; word-break: break-word; }
 .badge { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.74rem; font-weight: 600; }

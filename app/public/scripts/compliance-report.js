@@ -19,6 +19,40 @@ function fmtDate(s) {
   if (!s) return "—";
   try { return new Date(s).toLocaleString(); } catch { return s; }
 }
+
+// Parse PolicySummary.assetTags into { included:{op,tags[]}, excluded:{op,tags[]} }.
+// Input: "Included(all): Region - VN, EC2-aarch64, OS: Amazon Linux 2023;\nExcluded(any): EC2-x64;"
+function parseAssetTags(raw) {
+  if (!raw) return null;
+  const result = {};
+  // Match each "Included(...)" or "Excluded(...)" group up to the next semicolon or end.
+  const re = /(Included|Excluded)\(([^)]+)\)\s*:\s*([^;]+)/gi;
+  let m;
+  while ((m = re.exec(raw)) !== null) {
+    const kind = m[1].toLowerCase();   // "included" | "excluded"
+    const op   = m[2].trim();           // "all" | "any"
+    const tags = m[3].split(",").map((t) => t.trim()).filter(Boolean);
+    result[kind] = { op, tags };
+  }
+  return Object.keys(result).length ? result : null;
+}
+
+function renderAssetTags(raw) {
+  const parsed = parseAssetTags(raw);
+  if (!parsed) return "";
+
+  let html = "";
+  if (parsed.included) {
+    html += `<span class="at-label">Included (${esc(parsed.included.op)}):</span>`;
+    html += parsed.included.tags.map((t) => `<span class="asset-chip include">${esc(t)}</span>`).join("");
+  }
+  if (parsed.excluded) {
+    if (html) html += `<span class="at-label" style="margin-left:0.5rem">Excluded (${esc(parsed.excluded.op)}):</span>`;
+    else html += `<span class="at-label">Excluded (${esc(parsed.excluded.op)}):</span>`;
+    html += parsed.excluded.tags.map((t) => `<span class="asset-chip exclude">${esc(t)}</span>`).join("");
+  }
+  return html;
+}
 function statusBadge(s) {
   const cls = s === "Passed" ? "pass" : s === "Failed" ? "fail" : "neutral";
   return `<span class="badge ${cls}">${esc(s || "—")}</span>`;
@@ -66,6 +100,9 @@ async function loadReport() {
     ? '<span class="muted">Failed by criticality:</span>' +
       fbc.map((c) => `<span class="chip">${esc(c.label || "—")} <b>${esc(c.count)}</b></span>`).join("")
     : "";
+
+  // Asset tags from the policy summary — blue = included, orange = excluded.
+  $("assetTags").innerHTML = renderAssetTags(s?.assetTags ?? null);
 
   // Populate criticality filters (results + findings) from the same label list.
   const labels = r.criticalityLabels || [];

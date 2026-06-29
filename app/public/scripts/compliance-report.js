@@ -82,6 +82,12 @@ async function loadReport() {
     const el = $("execLink");
     el.href = `/compliance-executive.html?id=${reportId}`;
     el.style.display = "";
+
+    // Export-to-Excel needs an OS too (the section join requires it), so it's
+    // gated the same way — avoids offering a download that would 400.
+    const xl = $("exportXlsxLink");
+    xl.href = `/api/compliance-reports/${reportId}/export.xlsx`;
+    xl.style.display = "";
   }
 
   $("meta").innerHTML = `

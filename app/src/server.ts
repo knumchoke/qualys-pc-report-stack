@@ -3,6 +3,12 @@ import express, { Request, Response } from "express";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, Prisma } from "./generated/prisma/client";
 import { importComplianceReport } from "./complianceImport";
+import {
+  buildWorkbook,
+  exportFileName,
+  ReportNotFoundError,
+  ReportMissingOsError,
+} from "./scripts/export-report";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -763,6 +769,41 @@ app.get("/api/compliance-reports/:id/executive", async (req: Request, res: Respo
       },
     });
   } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Export one report as a multi-tab .xlsx workbook (Summary + charts, FirstScan,
+// Priority, _raw, CID). Streams the file to the client — no server-side copy is
+// written (the CLI script in scripts/export-report.ts keeps that dev/review path).
+//   404 if the report doesn't exist; 400 if it has no OS (the section join needs one).
+app.get("/api/compliance-reports/:id/export.xlsx", async (req: Request, res: Response) => {
+  const id = req.params.id;
+  try {
+    // Fetch the name fields up front so the filename is right even on success.
+    const report = await prisma.complianceReport.findUnique({
+      where: { id },
+      select: { fileName: true, title: true, os: true },
+    });
+    if (!report) return res.status(404).json({ error: "Report not found." });
+
+    const buf = await buildWorkbook(prisma, id);
+    const fileName = exportFileName(id, report);
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.setHeader("Content-Length", buf.length);
+    res.send(buf);
+  } catch (err) {
+    if (err instanceof ReportNotFoundError) {
+      return res.status(404).json({ error: err.message });
+    }
+    if (err instanceof ReportMissingOsError) {
+      return res.status(400).json({ error: err.message });
+    }
     res.status(500).json({ error: (err as Error).message });
   }
 });

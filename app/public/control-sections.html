@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Qualys Stack — Control Sections</title>
+    <link rel="stylesheet" href="/styles/styles.css" />
+  </head>
+  <body class="page-sections">
+    <nav id="topnav" class="topnav"></nav>
+    <main class="page">
+      <div class="container">
+        <h1>Control <span>Sections</span></h1>
+        <p class="sub">CRUD over the ControlSection model · (CID, OS) → section</p>
+
+        <div class="toolbar">
+          <input class="search" id="search" type="text" placeholder="Search CID, OS, section…" />
+          <select id="pageSize">
+            <option value="10">10 / page</option>
+            <option value="20" selected>20 / page</option>
+            <option value="50">50 / page</option>
+          </select>
+          <button id="addBtn">+ Add</button>
+          <a href="/control-sections-upload.html"><button class="ghost" type="button">⬆ Upload CSV</button></a>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>CID</th>
+              <th>OS</th>
+              <th>Section #</th>
+              <th>Section name</th>
+              <th>Updated</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div class="pager">
+          <span id="summary" class="muted"></span>
+          <button class="ghost" id="prev">‹ Prev</button>
+          <button class="ghost" id="next">Next ›</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Create / edit modal -->
+    <div class="overlay" id="overlay">
+      <div class="modal">
+        <h2 id="modalTitle">Add record</h2>
+        <input type="hidden" id="f-id" />
+        <div class="field">
+          <label for="f-cid">CID</label>
+          <input id="f-cid" type="number" inputmode="numeric" />
+        </div>
+        <div class="field">
+          <label for="f-os">OS</label>
+          <input id="f-os" type="text" />
+        </div>
+        <div class="field">
+          <label for="f-sectionNo">Section #</label>
+          <input id="f-sectionNo" type="number" inputmode="numeric" />
+        </div>
+        <div class="field">
+          <label for="f-sectionName">Section name</label>
+          <input id="f-sectionName" type="text" />
+        </div>
+        <div class="form-err" id="formErr"></div>
+        <div class="modal-actions">
+          <button class="ghost" id="cancelBtn" type="button">Cancel</button>
+          <button id="saveBtn" type="button">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="/scripts/nav.js"></script>
+    <script src="/scripts/control-sections.js"></script>
+  </body>
+</html>

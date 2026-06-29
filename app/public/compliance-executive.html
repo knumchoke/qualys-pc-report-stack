@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Qualys Stack — Executive Report</title>
+    <link rel="stylesheet" href="/styles/styles.css" />
+  </head>
+  <body class="exec-page">
+    <nav id="topnav" class="topnav no-print"></nav>
+
+    <div class="exec-topbar no-print">
+      <a id="backLink" href="/compliance-reports.html">← Back to report</a>
+      <button onclick="window.print()">Print / Save PDF</button>
+    </div>
+
+    <div id="execLoading" class="exec-msg">Loading…</div>
+    <div id="execError" class="exec-msg exec-err" hidden></div>
+
+    <!-- ── Slide A: Compliance Scan ─────────────────────────────────────── -->
+    <section class="exec-slide" id="slideA" hidden>
+      <!-- Header band -->
+      <div class="exec-hdr" id="execHdr"></div>
+
+      <!-- Two-panel body -->
+      <div class="exec-body">
+        <!-- Left: section stepped-area chart -->
+        <div class="exec-section-panel">
+          <div class="exec-panel-label">Section Heading</div>
+          <div class="exec-chart-outer">
+            <div class="exec-overall" id="execOverall"></div>
+            <div id="sectionSvgWrap"></div>
+            <div class="exec-sname-row" id="sectionNames"></div>
+          </div>
+        </div>
+
+        <!-- Right: criticality stacked bars -->
+        <div class="exec-crit-panel">
+          <div class="exec-panel-label">Control Criticality</div>
+          <div id="critBars"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Slide B: Prioritization ───────────────────────────────────────── -->
+    <section class="exec-slide exec-slide-b" id="slideB" hidden>
+      <div class="exec-slide-b-hdr" id="slideBHeader"></div>
+      <div class="exec-findings" id="findings"></div>
+    </section>
+
+    <script src="/scripts/nav.js"></script>
+    <script src="/scripts/compliance-executive.js"></script>
+  </body>
+</html>

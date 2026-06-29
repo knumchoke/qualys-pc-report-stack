@@ -1,0 +1,84 @@
+# ──────────────────────────────────────────────────────────────────────────
+# Secrets & sensitive data — NEVER commit these
+# ──────────────────────────────────────────────────────────────────────────
+# Environment files (all variants, any directory)
+.env
+.env.*
+*.env
+!.env.example
+!.env.sample
+!.env.template
+
+# Certificates / keys
+*.crt
+*.cer
+*.pem
+*.key
+*.p12
+*.pfx
+*.der
+*.csr
+*.keystore
+*.jks
+
+# Data dumps — Qualys compliance report CSVs and any other CSV/TSV
+*.csv
+*.tsv
+csvData/
+*.sql.gz
+*.dump
+*.bak
+
+# ──────────────────────────────────────────────────────────────────────────
+# Node / TypeScript
+# ──────────────────────────────────────────────────────────────────────────
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# Prisma generated client (regenerated on build)
+**/src/generated/
+**/generated/prisma/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs/
+
+# Coverage / test output
+coverage/
+.nyc_output/
+
+# Caches
+.cache/
+.npm/
+.eslintcache
+.parcel-cache/
+
+# ──────────────────────────────────────────────────────────────────────────
+# Docker / runtime volumes
+# ──────────────────────────────────────────────────────────────────────────
+postgres/data/
+pgdata/
+*.pid
+
+# ──────────────────────────────────────────────────────────────────────────
+# OS / editor cruft
+# ──────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+handoff.md
+.claude/
+api-relate/

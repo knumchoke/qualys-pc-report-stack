@@ -1,0 +1,12 @@
+# Local build artifacts — the image rebuilds these itself (multi-stage),
+# so never copy the macOS-built versions into the build context.
+node_modules
+dist
+# Prisma 7 generated client — regenerated inside the builder.
+src/generated
+
+# Misc
+.env
+.git
+*.log
+npm-debug.log

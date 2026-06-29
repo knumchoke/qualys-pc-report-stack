@@ -1,0 +1,203 @@
+generator client {
+  // Prisma 7's code-first generator. It emits TypeScript into `output` (compiled
+  // by our own tsc), and uses driver adapters instead of a Rust query engine — so
+  // no binaryTargets and no `url` on the datasource are needed here.
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  runtime      = "nodejs"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Simple demo model: log each page visit so the demo page can show real data.
+model Visit {
+  id        Int      @id @default(autoincrement())
+  path      String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@map("visits")
+}
+
+// Maps a (CID, OS) pair to its compliance section. section_name describes section_no.
+model ControlSection {
+  id          String   @id @default(uuid()) @db.Uuid
+  cid         Int
+  os          String
+  sectionNo   Int      @map("section_no")
+  sectionName String   @map("section_name")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Each CID+OS combination maps to exactly one section.
+  @@unique([cid, os])
+  @@map("control_sections")
+}
+
+// ============================================================================
+// Qualys Policy Compliance report (multi-section CSV). One uploaded file =
+// one ComplianceReport, which owns the rows from each section below. Designed
+// for very large files: the bulk (results) is bulk-inserted in batches, so no
+// per-row unique constraints — uniqueness/scoping is by reportId.
+// ============================================================================
+
+model ComplianceReport {
+  id          String   @id @default(uuid()) @db.Uuid
+  fileName    String   @map("file_name")
+  // OS key chosen at upload time, matching ControlSection.os. Drives the
+  // section mapping (join: ComplianceResult.controlId = ControlSection.cid
+  // AND ControlSection.os = this). Nullable for reports imported before this
+  // field existed; mandatory for all new uploads (enforced at the API).
+  os          String?
+  // From the file header (line 1): report title + generation timestamp.
+  title       String?
+  generatedAt DateTime? @map("generated_at")
+  // Optional preamble metadata (company / contact lines).
+  companyName String?  @map("company_name")
+  contactName String?  @map("contact_name")
+  contactLogin String? @map("contact_login")
+  // Row counts captured during import (handy without scanning child tables).
+  summaryCount Int     @default(0) @map("summary_count")
+  controlStatCount Int @default(0) @map("control_stat_count")
+  hostStatCount Int    @default(0) @map("host_stat_count")
+  resultCount  Int     @default(0) @map("result_count")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  summaries     PolicySummary[]
+  controlStats  ControlStatistic[]
+  hostStats     HostStatistic[]
+  results       ComplianceResult[]
+
+  @@map("compliance_reports")
+}
+
+// SUMMARY section — one row per policy in the report.
+model PolicySummary {
+  id                 String   @id @default(uuid()) @db.Uuid
+  reportId           String   @map("report_id") @db.Uuid
+  policyId           String   @map("policy_id")
+  policyTitle        String   @map("policy_title")
+  policyLocking      String?  @map("policy_locking")
+  policyModified     DateTime? @map("policy_modified")
+  policyLastEvaluated DateTime? @map("policy_last_evaluated")
+  assetGroups        String?  @map("asset_groups")
+  ips                String?
+  assetTags          String?  @map("asset_tags")
+  pcAgentIps         String?  @map("pc_agent_ips")
+  technologies       String?
+  controls           Int?
+  assets             Int?
+  controlInstances   Int?     @map("control_instances")
+  // "455(98.27%)" → passed=455, passedPct=98.27
+  passed             Int?
+  passedPct          Float?   @map("passed_pct")
+  failures           Int?
+  failuresPct        Float?   @map("failures_pct")
+  error              Int?
+  approvedExceptions Int?     @map("approved_exceptions")
+  pendingExceptions  Int?     @map("pending_exceptions")
+
+  report ComplianceReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@map("policy_summaries")
+}
+
+// Control Statistics — % of hosts passing each control.
+model ControlStatistic {
+  id              String  @id @default(uuid()) @db.Uuid
+  reportId        String  @map("report_id") @db.Uuid
+  orderNo         String  @map("order_no")
+  controlId       Int     @map("control_id")
+  deprecated      Boolean @default(false)
+  statement       String
+  criticalityLabel String? @map("criticality_label")
+  criticalityValue Int?   @map("criticality_value")
+  // "100% (1 of 1)" → percentage=100, passedHosts=1, totalHosts=1
+  percentage      Float?
+  passedHosts     Int?    @map("passed_hosts")
+  totalHosts      Int?    @map("total_hosts")
+
+  report ComplianceReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@index([reportId, controlId])
+  @@map("control_statistics")
+}
+
+// Host Statistics — % of controls passing per host (asset tags merged in).
+model HostStatistic {
+  id              String  @id @default(uuid()) @db.Uuid
+  reportId        String  @map("report_id") @db.Uuid
+  ipAddress       String  @map("ip_address")
+  trackingMethod  String? @map("tracking_method")
+  dnsName         String? @map("dns_name")
+  netbiosName     String? @map("netbios_name")
+  operatingSystem String? @map("operating_system")
+  lastScanDate    DateTime? @map("last_scan_date")
+  // "98.27% (455 of 463)" → percentage=98.27, passedControls=455, totalControls=463
+  percentage      Float?
+  passedControls  Int?    @map("passed_controls")
+  totalControls   Int?    @map("total_controls")
+  qualysHostId    String? @map("qualys_host_id")
+  hostId          String? @map("host_id")
+  assetTags       String? @map("asset_tags")
+
+  report ComplianceReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@map("host_statistics")
+}
+
+// RESULTS — the bulk: one row per host × control instance. Large text fields
+// (evidence/remediation/rationale) live here, hence the file size.
+model ComplianceResult {
+  id                  String   @id @default(uuid()) @db.Uuid
+  reportId            String   @map("report_id") @db.Uuid
+  hostIp              String?  @map("host_ip")
+  dnsHostname         String?  @map("dns_hostname")
+  netbiosHostname     String?  @map("netbios_hostname")
+  trackingMethod      String?  @map("tracking_method")
+  operatingSystem     String?  @map("operating_system")
+  network             String?
+  lastScanDate        DateTime? @map("last_scan_date")
+  evaluationDate      DateTime? @map("evaluation_date")
+  controlId           Int?     @map("control_id")
+  controlReferences   String?  @map("control_references")
+  technology          String?
+  control             String?
+  criticalityLabel    String?  @map("criticality_label")
+  criticalityValue    Int?     @map("criticality_value")
+  instance            String?
+  rationale           String?
+  status              String?
+  remediation         String?
+  deprecated          Boolean  @default(false)
+  evidence            String?
+  exceptionAssignee   String?  @map("exception_assignee")
+  exceptionStatus     String?  @map("exception_status")
+  exceptionEndDate    DateTime? @map("exception_end_date")
+  exceptionCreator    String?  @map("exception_creator")
+  exceptionCreatedDate DateTime? @map("exception_created_date")
+  exceptionModifier   String?  @map("exception_modifier")
+  exceptionModifiedDate DateTime? @map("exception_modified_date")
+  causeOfFailure      String?  @map("cause_of_failure")
+  qualysHostId        String?  @map("qualys_host_id")
+  previousStatus      String?  @map("previous_status")
+  firstFailDate       DateTime? @map("first_fail_date")
+  lastFailDate        DateTime? @map("last_fail_date")
+  firstPassDate       DateTime? @map("first_pass_date")
+  lastPassDate        DateTime? @map("last_pass_date")
+
+  report ComplianceReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@index([reportId, status])
+  @@index([reportId, controlId])
+  @@index([reportId, hostIp])
+  @@map("compliance_results")
+}

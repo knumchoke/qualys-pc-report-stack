@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Qualys Stack — Compliance Reports</title>
+    <link rel="stylesheet" href="/styles/styles.css" />
+  </head>
+  <body class="page-sections page-compliance">
+    <nav id="topnav" class="topnav"></nav>
+    <main class="page">
+      <div class="container">
+        <h1>Compliance <span>Reports</span></h1>
+        <p class="sub">Uploaded Qualys policy compliance reports</p>
+
+        <div class="toolbar">
+          <span class="search muted" id="summary"></span>
+          <a href="/compliance-upload.html"><button type="button">⬆ Upload report</button></a>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>File</th>
+              <th>OS</th>
+              <th>Policy</th>
+              <th>Generated</th>
+              <th>Hosts</th>
+              <th>Controls</th>
+              <th>Results</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </main>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="/scripts/nav.js"></script>
+    <script src="/scripts/compliance-reports.js"></script>
+  </body>
+</html>

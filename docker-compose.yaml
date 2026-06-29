@@ -1,0 +1,99 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: qualys_nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT:-80}:80"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    depends_on:
+      - app
+    networks:
+      - qualys_net
+
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: qualys_app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3000
+      DATABASE_URL: postgres://${POSTGRES_USER:-qualys}:${POSTGRES_PASSWORD:-qualys}@postgres:5432/${POSTGRES_DB:-qualys}
+    expose:
+      - "3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - qualys_net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: qualys_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-qualys}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-qualys}
+      POSTGRES_DB: ${POSTGRES_DB:-qualys}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-qualys} -d ${POSTGRES_DB:-qualys}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - qualys_net
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: qualys_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@qualys.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      # pgAdmin's validator rejects non-routable TLDs like .local; allow it so the
+      # default admin@qualys.local email is accepted. Value is a Python list literal.
+      PGADMIN_CONFIG_ALLOW_SPECIAL_EMAIL_DOMAINS: "['local']"
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - qualys_net
+
+  metabase:
+    image: metabase/metabase:v0.50.8
+    container_name: qualys_metabase
+    restart: unless-stopped
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: ${METABASE_DB:-metabase}
+      MB_DB_PORT: 5432
+      MB_DB_USER: ${POSTGRES_USER:-qualys}
+      MB_DB_PASS: ${POSTGRES_PASSWORD:-qualys}
+      MB_DB_HOST: postgres
+    ports:
+      - "${METABASE_PORT:-3001}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - qualys_net
+
+networks:
+  qualys_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  pgadmin_data:

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Qualys Stack — Compliance · Upload Report</title>
+    <link rel="stylesheet" href="/styles/styles.css" />
+  </head>
+  <body class="page-upload page-compliance">
+    <nav id="topnav" class="topnav"></nav>
+    <main class="page">
+      <div class="container">
+        <h1>Compliance · <span>Upload Report</span></h1>
+        <p class="sub">Drop a Qualys policy compliance report CSV. Large files (100MB+) are streamed and imported in batches.</p>
+
+        <div class="field" style="max-width: 360px; margin-top: 1.25rem;">
+          <label for="os">Operating system <span style="color: var(--err)">*</span></label>
+          <select id="os">
+            <option value="">Select an OS…</option>
+          </select>
+          <div class="form-err" id="osErr"></div>
+        </div>
+
+        <div class="dropzone" id="dropzone">
+          <div class="icon">⬆</div>
+          <div>Drag &amp; drop a <strong>.csv</strong> report here</div>
+          <div class="hint">or click to browse</div>
+          <div class="file" id="filename"></div>
+        </div>
+        <input type="file" id="fileInput" accept=".csv,text/csv" />
+
+        <div class="result" id="result"></div>
+      </div>
+    </main>
+
+    <script src="/scripts/nav.js"></script>
+    <script src="/scripts/compliance-upload.js"></script>
+  </body>
+</html>

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Qualys Stack — Control Sections · CSV Upload</title>
+    <link rel="stylesheet" href="/styles/styles.css" />
+  </head>
+  <body class="page-upload">
+    <nav id="topnav" class="topnav"></nav>
+    <main class="page">
+      <div class="container">
+        <h1>Control Sections · <span>CSV Upload</span></h1>
+        <p class="sub">Columns: <code>CID, OS, section_no, section_name</code> · review the changes before they are written</p>
+
+        <div class="dropzone" id="dropzone">
+          <div class="icon">⬆</div>
+          <div>Drag &amp; drop a <strong>.csv</strong> file here</div>
+          <div class="hint">or click to browse</div>
+          <div class="file" id="filename"></div>
+        </div>
+        <input type="file" id="fileInput" accept=".csv,text/csv" />
+
+        <!-- Preview of pending changes -->
+        <div class="panel" id="preview">
+          <h2>Review changes</h2>
+          <div class="muted" id="previewMeta"></div>
+          <div class="stats">
+            <div class="stat create"><div class="n" id="nCreate">0</div><div class="l">To create</div></div>
+            <div class="stat update"><div class="n" id="nUpdate">0</div><div class="l">To update</div></div>
+            <div class="stat unchanged"><div class="n" id="nUnchanged">0</div><div class="l">Unchanged</div></div>
+          </div>
+
+          <div id="updateDiff"></div>
+          <div id="createDiff"></div>
+
+          <div class="actions">
+            <button class="ghost" id="cancelBtn" type="button">Cancel</button>
+            <button id="confirmBtn" type="button">Confirm &amp; apply</button>
+          </div>
+        </div>
+
+        <div class="result" id="result"></div>
+      </div>
+    </main>
+
+    <script src="/scripts/nav.js"></script>
+    <script src="/scripts/control-sections-upload.js"></script>
+  </body>
+</html>

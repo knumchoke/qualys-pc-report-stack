@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Qualys Stack — Demo</title>
+    <link rel="stylesheet" href="/styles/styles.css" />
+  </head>
+  <body class="page-home">
+    <nav id="topnav" class="topnav"></nav>
+    <main class="page">
+      <div class="container">
+        <h1>Qualys <span>Stack</span> Demo</h1>
+        <p class="sub">nginx → node.js app → postgres · pgadmin · metabase</p>
+
+        <div class="grid">
+          <div class="card">
+            <h2>App info</h2>
+            <pre id="info">loading…</pre>
+          </div>
+          <div class="card">
+            <h2>Database</h2>
+            <div class="status"><span class="dot" id="db-dot"></span><span id="db-text">checking…</span></div>
+            <pre id="db" style="margin-top:0.75rem;"></pre>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button id="refresh">Refresh</button>
+          <a href="/control-sections.html"><button type="button">Control Sections</button></a>
+        </div>
+
+        <footer>
+          Services:
+          <a href="http://localhost:5050" target="_blank">pgAdmin :5050</a> ·
+          <a href="http://localhost:3001" target="_blank">Metabase :3001</a>
+        </footer>
+      </div>
+    </main>
+
+    <script src="/scripts/nav.js"></script>
+    <script src="/scripts/index.js"></script>
+  </body>
+</html>

@@ -582,12 +582,15 @@ app.delete("/api/compliance-reports/:id", async (req: Request, res: Response) =>
   }
 });
 
-// Failed findings grouped by control for one report, optionally filtered by criticality label.
-// Returns every distinct (controlId, control, criticalityLabel) that has ≥1 failure, with a count,
-// ordered by count desc. Used by the findings-by-control table on the report drill-down page.
+// Failed findings grouped by control for one report, with optional criticality filter, text search,
+// and pagination. Returns { data, total, page, pageSize } like the other paginated endpoints.
 app.get("/api/compliance-reports/:id/findings-by-control", async (req: Request, res: Response) => {
   const id = req.params.id;
+  const page     = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 25));
   const criticality = typeof req.query.criticality === "string" ? req.query.criticality.trim() : "";
+  const q           = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  const offset      = (page - 1) * pageSize;
 
   try {
     const report = await prisma.complianceReport.findUnique({ where: { id }, select: { id: true } });
@@ -599,23 +602,31 @@ app.get("/api/compliance-reports/:id/findings-by-control", async (req: Request, 
       criticality_label: string | null;
       criticality_value: number | null;
       count: bigint;
+      total_count: bigint;
     };
 
-    const rows: FindingRow[] = criticality
-      ? await prisma.$queryRaw<FindingRow[]>`
-          SELECT control_id, control, criticality_label, criticality_value, COUNT(*) AS count
-          FROM compliance_results
-          WHERE report_id = ${id}::uuid AND status = 'Failed' AND criticality_label = ${criticality}
-          GROUP BY control_id, control, criticality_label, criticality_value
-          ORDER BY count DESC
-        `
-      : await prisma.$queryRaw<FindingRow[]>`
-          SELECT control_id, control, criticality_label, criticality_value, COUNT(*) AS count
-          FROM compliance_results
-          WHERE report_id = ${id}::uuid AND status = 'Failed'
-          GROUP BY control_id, control, criticality_label, criticality_value
-          ORDER BY count DESC
-        `;
+    const critClause = criticality ? Prisma.sql`AND criticality_label = ${criticality}` : Prisma.empty;
+    const qLike = `%${q}%`;
+    const searchClause = q
+      ? Prisma.sql`AND (control ILIKE ${qLike} OR CAST(control_id AS TEXT) ILIKE ${qLike})`
+      : Prisma.empty;
+
+    const rows = await prisma.$queryRaw<FindingRow[]>(Prisma.sql`
+      WITH grp AS (
+        SELECT control_id, control, criticality_label, criticality_value, COUNT(*) AS count
+        FROM compliance_results
+        WHERE report_id = ${id}::uuid AND status = 'Failed'
+        ${critClause}
+        ${searchClause}
+        GROUP BY control_id, control, criticality_label, criticality_value
+      )
+      SELECT *, COUNT(*) OVER() AS total_count
+      FROM grp
+      ORDER BY count DESC
+      LIMIT ${pageSize} OFFSET ${offset}
+    `);
+
+    const total = rows.length > 0 ? Number(rows[0].total_count) : 0;
 
     res.json({
       data: rows.map((r) => ({
@@ -625,6 +636,9 @@ app.get("/api/compliance-reports/:id/findings-by-control", async (req: Request, 
         criticalityValue: r.criticality_value,
         count: Number(r.count),
       })),
+      total,
+      page,
+      pageSize,
     });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });

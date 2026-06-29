@@ -12,6 +12,12 @@ let hostPageSize = 20;
 let hostTotal = 0;
 let hostSearchTimer = null;
 
+// Findings-by-control pagination state.
+let findingPage = 1;
+let findingPageSize = 25;
+let findingTotal = 0;
+let findingSearchTimer = null;
+
 function esc(s) {
   return String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
@@ -120,11 +126,17 @@ async function loadReport() {
 }
 
 async function loadFindings() {
-  const criticality = $("findingCriticality").value;
-  const params = new URLSearchParams({ criticality });
+  findingPageSize = Number($("findingPageSize").value);
+  const params = new URLSearchParams({
+    page: findingPage,
+    pageSize: findingPageSize,
+    criticality: $("findingCriticality").value,
+    q: $("findingSearch").value.trim(),
+  });
   const res = await fetch(`/api/compliance-reports/${reportId}/findings-by-control?` + params.toString());
   if (!res.ok) return;
   const json = await res.json();
+  findingTotal = json.total ?? 0;
   const data = json.data || [];
 
   $("findingRows").innerHTML = data.length
@@ -140,6 +152,13 @@ async function loadFindings() {
         )
         .join("")
     : '<tr><td class="empty" colspan="4">No findings.</td></tr>';
+
+  const pages = Math.max(1, Math.ceil(findingTotal / findingPageSize));
+  const from = findingTotal === 0 ? 0 : (findingPage - 1) * findingPageSize + 1;
+  const to = Math.min(findingPage * findingPageSize, findingTotal);
+  $("findingSummary").textContent = `${from}–${to} of ${findingTotal}`;
+  $("findingPrev").disabled = findingPage <= 1;
+  $("findingNext").disabled = findingPage >= pages;
 }
 
 async function loadHosts() {
@@ -259,7 +278,14 @@ $("hostPageSize").addEventListener("change", () => { hostPage = 1; loadHosts(); 
 $("hostPrev").addEventListener("click", () => { if (hostPage > 1) { hostPage--; loadHosts(); } });
 $("hostNext").addEventListener("click", () => { hostPage++; loadHosts(); });
 
-$("findingCriticality").addEventListener("change", () => loadFindings());
+$("findingSearch").addEventListener("input", () => {
+  clearTimeout(findingSearchTimer);
+  findingSearchTimer = setTimeout(() => { findingPage = 1; loadFindings(); }, 300);
+});
+$("findingCriticality").addEventListener("change", () => { findingPage = 1; loadFindings(); });
+$("findingPageSize").addEventListener("change", () => { findingPage = 1; loadFindings(); });
+$("findingPrev").addEventListener("click", () => { if (findingPage > 1) { findingPage--; loadFindings(); } });
+$("findingNext").addEventListener("click", () => { findingPage++; loadFindings(); });
 
 loadReport();
 loadFindings();

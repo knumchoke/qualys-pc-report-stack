@@ -26,8 +26,18 @@
         <!-- Findings by control -->
         <div class="section-title">Findings by control</div>
         <div class="toolbar">
+          <input class="search" id="findingSearch" type="text" placeholder="Search control id, control…" />
           <select id="findingCriticality">
             <option value="">All criticality</option>
+          </select>
+          <select id="findingPageSize">
+            <option value="5">5 / page</option>
+            <option value="10">10 / page</option>
+            <option value="15">15 / page</option>
+            <option value="20">20 / page</option>
+            <option value="25" selected>25 / page</option>
+            <option value="50">50 / page</option>
+            <option value="100">100 / page</option>
           </select>
         </div>
         <table id="findingsByControl">
@@ -36,15 +46,24 @@
           </thead>
           <tbody id="findingRows"></tbody>
         </table>
+        <div class="pager">
+          <span id="findingSummary" class="muted"></span>
+          <button class="ghost" id="findingPrev">‹ Prev</button>
+          <button class="ghost" id="findingNext">Next ›</button>
+        </div>
 
         <!-- Host statistics -->
         <div class="section-title">Host statistics</div>
         <div class="toolbar">
           <input class="search" id="hostSearch" type="text" placeholder="Search IP, DNS, OS…" />
           <select id="hostPageSize">
+            <option value="5">5 / page</option>
             <option value="10">10 / page</option>
+            <option value="15">15 / page</option>
             <option value="20" selected>20 / page</option>
+            <option value="25">25 / page</option>
             <option value="50">50 / page</option>
+            <option value="100">100 / page</option>
           </select>
         </div>
         <table>
@@ -72,6 +91,10 @@
             <option value="">All criticality</option>
           </select>
           <select id="pageSize">
+            <option value="5">5 / page</option>
+            <option value="10">10 / page</option>
+            <option value="15">15 / page</option>
+            <option value="20">20 / page</option>
             <option value="25" selected>25 / page</option>
             <option value="50">50 / page</option>
             <option value="100">100 / page</option>

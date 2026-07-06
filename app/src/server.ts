@@ -1,4 +1,5 @@
 import path from "path";
+import fs from "fs";
 import express, { Request, Response } from "express";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, Prisma } from "./generated/prisma/client";
@@ -787,16 +788,28 @@ app.get("/api/compliance-reports/:id/export.xlsx", async (req: Request, res: Res
     });
     if (!report) return res.status(404).json({ error: "Report not found." });
 
-    const buf = await buildWorkbook(prisma, id);
+    // buildWorkbook streams the workbook to a temp file (bounded memory, even on
+    // very large reports) and returns its path; we stream it to the client and
+    // delete it afterwards.
+    const tmpPath = await buildWorkbook(prisma, id);
     const fileName = exportFileName(id, report);
+    const cleanup = () => fs.unlink(tmpPath, () => {});
 
+    const stat = fs.statSync(tmpPath);
     res.setHeader(
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
     res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
-    res.setHeader("Content-Length", buf.length);
-    res.send(buf);
+    res.setHeader("Content-Length", stat.size);
+
+    const stream = fs.createReadStream(tmpPath);
+    stream.on("error", () => {
+      cleanup();
+      if (!res.headersSent) res.status(500).end();
+    });
+    res.on("close", cleanup);
+    stream.pipe(res);
   } catch (err) {
     if (err instanceof ReportNotFoundError) {
       return res.status(404).json({ error: err.message });

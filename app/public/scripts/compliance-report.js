@@ -88,6 +88,9 @@ async function loadReport() {
     const xl = $("exportXlsxLink");
     xl.href = `/api/compliance-reports/${reportId}/export.xlsx`;
     xl.style.display = "";
+
+    // Criticality + section summary tables also need the OS (section mapping).
+    loadSummaryTables();
   }
 
   $("meta").innerHTML = `
@@ -129,6 +132,55 @@ async function loadReport() {
   const fcurrent = fsel.value;
   fsel.innerHTML = '<option value="">All criticality</option>' + optionsHtml;
   fsel.value = fcurrent;
+}
+
+// Criticality (Mandatory/Optional) + per-section summary tables — same data as
+// the Excel export, sourced from the executive endpoint. Skips silently if the
+// report has no OS (the section mapping needs it).
+async function loadSummaryTables() {
+  const res = await fetch(`/api/compliance-reports/${reportId}/executive`);
+  if (!res.ok) return;
+  const d = await res.json();
+  const crit = d.criticality || [];
+  const sections = d.sections || [];
+  const overall = d.overall || {};
+  const n = (v) => Number(v || 0).toLocaleString();
+  const sum = (arr, k) => arr.reduce((a, c) => a + (c[k] || 0), 0);
+
+  // Mandatory = HIGH + MEDIUM (criticalityValue >= 4); Optional = the rest.
+  const mand = crit.filter((c) => c.value >= 4);
+  const opt = crit.filter((c) => c.value < 4);
+  const critTable = `
+    <table>
+      <thead><tr><th>Control Criticality</th><th class="num">Passed</th><th class="num">Failed</th></tr></thead>
+      <tbody>
+        <tr><td>Mandatory</td><td class="num">${n(sum(mand, "passed"))}</td><td class="num">${n(sum(mand, "failed"))}</td></tr>
+        <tr><td>Optional</td><td class="num">${n(sum(opt, "passed"))}</td><td class="num">${n(sum(opt, "failed"))}</td></tr>
+      </tbody>
+    </table>`;
+
+  const totPassed = overall.passed ?? sum(sections, "passed");
+  const totFailed = overall.failed ?? sum(sections, "failed");
+  const grand = totPassed + totFailed;
+  const passPct = overall.passedPct != null ? overall.passedPct : grand ? (totPassed / grand) * 100 : 0;
+  const failPct = overall.failedPct != null ? overall.failedPct : grand ? (totFailed / grand) * 100 : 0;
+  const secTable = `
+    <table>
+      <thead><tr><th>Section Name</th><th class="num">Passed</th><th class="num">Failed</th><th class="num">Total</th></tr></thead>
+      <tbody>
+        ${sections
+          .map(
+            (s) => `<tr><td>${esc(s.sectionName)}</td><td class="num">${n(s.passed)}</td><td class="num">${n(s.failed)}</td><td class="num">${n(s.total)}</td></tr>`,
+          )
+          .join("")}
+      </tbody>
+      <tfoot>
+        <tr><td>Total</td><td class="num">${n(totPassed)}</td><td class="num">${n(totFailed)}</td><td class="num">${n(grand)}</td></tr>
+        <tr class="pct"><td>% pass / failed</td><td class="num">${Number(passPct).toFixed(1)}%</td><td class="num">${Number(failPct).toFixed(1)}%</td><td class="num"></td></tr>
+      </tfoot>
+    </table>`;
+
+  $("summaryTables").innerHTML = critTable + secTable;
 }
 
 async function loadFindings() {

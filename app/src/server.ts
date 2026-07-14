@@ -424,25 +424,46 @@ app.post("/api/compliance-reports/upload", async (req: Request, res: Response) =
   }
 });
 
-// List uploaded reports (metadata + row counts; no heavy result rows).
-app.get("/api/compliance-reports", async (_req: Request, res: Response) => {
+// List uploaded reports (metadata + row counts; no heavy result rows),
+// paginated with search over file name / OS / policy title.
+app.get("/api/compliance-reports", async (req: Request, res: Response) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 25));
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+
+  const where: Prisma.ComplianceReportWhereInput = {};
+  if (q) {
+    where.OR = [
+      { fileName: { contains: q, mode: "insensitive" } },
+      { os: { contains: q, mode: "insensitive" } },
+      { title: { contains: q, mode: "insensitive" } },
+    ];
+  }
+
   try {
-    const data = await prisma.complianceReport.findMany({
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        fileName: true,
-        os: true,
-        title: true,
-        generatedAt: true,
-        summaryCount: true,
-        controlStatCount: true,
-        hostStatCount: true,
-        resultCount: true,
-        createdAt: true,
-      },
-    });
-    res.json({ data });
+    const [data, total] = await Promise.all([
+      prisma.complianceReport.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true,
+          fileName: true,
+          os: true,
+          title: true,
+          generatedAt: true,
+          summaryCount: true,
+          controlStatCount: true,
+          hostStatCount: true,
+          resultCount: true,
+          createdAt: true,
+          summaries: { select: { assetTags: true } },
+        },
+      }),
+      prisma.complianceReport.count({ where }),
+    ]);
+    res.json({ data, total, page, pageSize });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }

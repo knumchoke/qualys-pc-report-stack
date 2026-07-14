@@ -6,7 +6,7 @@
     <title>Qualys Stack — Compliance Reports</title>
     <link rel="stylesheet" href="/styles/styles.css" />
   </head>
-  <body class="page-sections page-compliance">
+  <body class="page-sections page-compliance page-report-list">
     <nav id="topnav" class="topnav"></nav>
     <main class="page">
       <div class="container">
@@ -14,16 +14,24 @@
         <p class="sub">Uploaded Qualys policy compliance reports</p>
 
         <div class="toolbar">
-          <span class="search muted" id="summary"></span>
+          <input class="search" id="search" type="text" placeholder="Search file name, OS, policy…" />
+          <select id="pageSize">
+            <option value="10">10 / page</option>
+            <option value="25" selected>25 / page</option>
+            <option value="50">50 / page</option>
+            <option value="100">100 / page</option>
+          </select>
           <a href="/compliance-upload.html"><button type="button">⬆ Upload report</button></a>
         </div>
 
+        <div class="table-scroll">
         <table>
           <thead>
             <tr>
               <th>File</th>
               <th>OS</th>
               <th>Policy</th>
+              <th>Asset tags</th>
               <th>Generated</th>
               <th>Hosts</th>
               <th>Controls</th>
@@ -33,12 +41,19 @@
           </thead>
           <tbody id="rows"></tbody>
         </table>
+        </div>
+        <div class="pager">
+          <span id="summary" class="muted"></span>
+          <button class="ghost" id="prev">‹ Prev</button>
+          <button class="ghost" id="next">Next ›</button>
+        </div>
       </div>
     </main>
 
     <div class="toast" id="toast"></div>
 
     <script src="/scripts/nav.js"></script>
+    <script src="/scripts/asset-tags.js"></script>
     <script src="/scripts/compliance-reports.js"></script>
   </body>
 </html>

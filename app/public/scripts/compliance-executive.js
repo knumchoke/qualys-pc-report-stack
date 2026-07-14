@@ -86,7 +86,9 @@ function buildSectionSvg(sections) {
 
   const viewH = bottom + 4;
   return `<svg viewBox="0 0 660 ${viewH}" preserveAspectRatio="none"
+    role="img" aria-label="Section compliance chart — ${sections.length} sections"
     style="width:100%;display:block;border-radius:8px;overflow:hidden">
+    <title>Section compliance chart — ${sections.length} sections</title>
     <rect x="0" y="0" width="660" height="${viewH}" fill="#0a1929"/>
     ${grid}
     ${vdiv}
@@ -132,33 +134,41 @@ function buildCritBars(criticality) {
     .join("");
 }
 
-// ── HIGH findings cards ───────────────────────────────────────────────────────
+// ── Prioritization tier slides ────────────────────────────────────────────────
 
-function buildFindings(highFindings) {
-  const { total, items } = highFindings;
-  if (items.length === 0) {
-    return '<p class="muted">No HIGH criticality failures.</p>';
-  }
+function buildTierSlide(tier) {
+  const { label, total, items } = tier;
+  const col = CRIT_COLOR[label] || "#94a3b8";
 
-  let html = "";
+  let cards = "";
   items.forEach((item, i) => {
-    html += `<div class="exec-card">
+    cards += `<div class="exec-card">
       <div class="exec-card-n">${item.count}</div>
       <div class="exec-card-sub">Finding</div>
       <div class="exec-card-txt">${esc(item.control)}</div>
     </div>`;
     if (i < items.length - 1) {
-      html += '<div class="exec-arrow" aria-hidden="true">→</div>';
+      cards += '<div class="exec-arrow" aria-hidden="true">→</div>';
     }
   });
 
-  html += `<div class="exec-arrow" aria-hidden="true">→</div>
+  cards += `<div class="exec-arrow" aria-hidden="true">→</div>
     <div class="exec-total-badge">
       <div class="exec-total-n">${total}</div>
       <div class="exec-total-sub">Finding</div>
     </div>`;
 
-  return html;
+  return `<section class="exec-slide exec-slide-b">
+    <div class="exec-slide-b-hdr">
+      Prioritization &mdash; <span class="crit-tag" style="--crit-col:${col}">${esc(label)}</span> Criticality
+    </div>
+    <div class="exec-findings">${cards}</div>
+  </section>`;
+}
+
+function buildPrioritizationSlides(prioritization) {
+  const slides = prioritization.filter((t) => t.items.length > 0).map(buildTierSlide);
+  return slides.length ? slides.join("") : '<section class="exec-slide exec-slide-b"><p class="muted">No failures recorded.</p></section>';
 }
 
 // ── Main load ─────────────────────────────────────────────────────────────────
@@ -177,14 +187,16 @@ async function load() {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || `HTTP ${res.status}`);
     }
-    const { report, overall, sections, criticality, highFindings } = await res.json();
+    const { report, overall, sections, criticality, prioritization } = await res.json();
 
     $("backLink").href = `/compliance-report.html?id=${reportId}`;
-    document.title = `Executive Report — ${report.title || report.os}`;
+    const reportLabel = report.title || report.os;
+    document.title = `Executive Report — ${reportLabel}`;
+    $("pageTitle").textContent = `Executive Report — ${reportLabel}`;
 
     // Header band
     $("execHdr").innerHTML = `
-      <span class="exec-hdr-n">${esc(String(report.serverCount))}</span>
+      <span class="exec-hdr-n">${esc(String(report.serverCount ?? "—"))}</span>
       <span class="exec-hdr-word">Server</span>
       <span class="exec-hdr-tag">+</span>
       <span class="exec-hdr-word">CIS</span>
@@ -199,28 +211,28 @@ async function load() {
       <div class="ov-fail">${overall.failedPct ?? "—"}%</div>
       <div class="ov-lbl">Failed</div>`;
 
-    // Section SVG
-    $("sectionSvgWrap").innerHTML = buildSectionSvg(sections);
-
-    // Section name labels (below SVG, one flex-cell per section)
-    $("sectionNames").innerHTML = sections
-      .map((s) => `<div class="exec-sname">${esc(s.sectionName)}</div>`)
-      .join("");
+    // Section SVG — guard against empty sections (OS mismatch / all-unmapped)
+    if (sections.length === 0) {
+      $("sectionSvgWrap").innerHTML = '<p class="muted" style="padding:1rem 0">No section mapping found for this OS.</p>';
+      $("sectionNames").innerHTML = "";
+    } else {
+      $("sectionSvgWrap").innerHTML = buildSectionSvg(sections);
+      $("sectionNames").innerHTML = sections
+        .map((s) => `<div class="exec-sname">${esc(s.sectionName)}</div>`)
+        .join("");
+    }
 
     // Criticality bars
     $("critBars").innerHTML = buildCritBars(criticality);
 
-    // Slide B header
-    $("slideBHeader").innerHTML = `
-      Prioritization &mdash; <span class="high-tag">HIGH</span> Criticality`;
+    // Prioritization slides (one per criticality tier, high→low)
+    const prioEl = $("prioritizationSlides");
+    prioEl.innerHTML = buildPrioritizationSlides(prioritization || []);
+    prioEl.hidden = false;
 
-    // Findings
-    $("findings").innerHTML = buildFindings(highFindings);
-
-    // Reveal slides
+    // Reveal Slide A
     $("execLoading").hidden = true;
     $("slideA").hidden = false;
-    $("slideB").hidden = false;
   } catch (err) {
     $("execLoading").hidden = true;
     $("execError").textContent = "Error: " + err.message;

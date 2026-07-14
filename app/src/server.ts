@@ -1,8 +1,15 @@
 import path from "path";
+import fs from "fs";
 import express, { Request, Response } from "express";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, Prisma } from "./generated/prisma/client";
 import { importComplianceReport } from "./complianceImport";
+import {
+  buildWorkbook,
+  exportFileName,
+  ReportNotFoundError,
+  ReportMissingOsError,
+} from "./scripts/export-report";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -417,25 +424,46 @@ app.post("/api/compliance-reports/upload", async (req: Request, res: Response) =
   }
 });
 
-// List uploaded reports (metadata + row counts; no heavy result rows).
-app.get("/api/compliance-reports", async (_req: Request, res: Response) => {
+// List uploaded reports (metadata + row counts; no heavy result rows),
+// paginated with search over file name / OS / policy title.
+app.get("/api/compliance-reports", async (req: Request, res: Response) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 25));
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+
+  const where: Prisma.ComplianceReportWhereInput = {};
+  if (q) {
+    where.OR = [
+      { fileName: { contains: q, mode: "insensitive" } },
+      { os: { contains: q, mode: "insensitive" } },
+      { title: { contains: q, mode: "insensitive" } },
+    ];
+  }
+
   try {
-    const data = await prisma.complianceReport.findMany({
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        fileName: true,
-        os: true,
-        title: true,
-        generatedAt: true,
-        summaryCount: true,
-        controlStatCount: true,
-        hostStatCount: true,
-        resultCount: true,
-        createdAt: true,
-      },
-    });
-    res.json({ data });
+    const [data, total] = await Promise.all([
+      prisma.complianceReport.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true,
+          fileName: true,
+          os: true,
+          title: true,
+          generatedAt: true,
+          summaryCount: true,
+          controlStatCount: true,
+          hostStatCount: true,
+          resultCount: true,
+          createdAt: true,
+          summaries: { select: { assetTags: true } },
+        },
+      }),
+      prisma.complianceReport.count({ where }),
+    ]);
+    res.json({ data, total, page, pageSize });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
@@ -582,6 +610,69 @@ app.delete("/api/compliance-reports/:id", async (req: Request, res: Response) =>
   }
 });
 
+// Failed findings grouped by control for one report, with optional criticality filter, text search,
+// and pagination. Returns { data, total, page, pageSize } like the other paginated endpoints.
+app.get("/api/compliance-reports/:id/findings-by-control", async (req: Request, res: Response) => {
+  const id = req.params.id;
+  const page     = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 25));
+  const criticality = typeof req.query.criticality === "string" ? req.query.criticality.trim() : "";
+  const q           = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  const offset      = (page - 1) * pageSize;
+
+  try {
+    const report = await prisma.complianceReport.findUnique({ where: { id }, select: { id: true } });
+    if (!report) return res.status(404).json({ error: "Report not found." });
+
+    type FindingRow = {
+      control_id: number;
+      control: string;
+      criticality_label: string | null;
+      criticality_value: number | null;
+      count: bigint;
+      total_count: bigint;
+    };
+
+    const critClause = criticality ? Prisma.sql`AND criticality_label = ${criticality}` : Prisma.empty;
+    const qLike = `%${q}%`;
+    const searchClause = q
+      ? Prisma.sql`AND (control ILIKE ${qLike} OR CAST(control_id AS TEXT) ILIKE ${qLike})`
+      : Prisma.empty;
+
+    const rows = await prisma.$queryRaw<FindingRow[]>(Prisma.sql`
+      WITH grp AS (
+        SELECT control_id, control, criticality_label, criticality_value, COUNT(*) AS count
+        FROM compliance_results
+        WHERE report_id = ${id}::uuid AND status = 'Failed'
+        ${critClause}
+        ${searchClause}
+        GROUP BY control_id, control, criticality_label, criticality_value
+      )
+      SELECT *, COUNT(*) OVER() AS total_count
+      FROM grp
+      ORDER BY count DESC
+      LIMIT ${pageSize} OFFSET ${offset}
+    `);
+
+    const total = rows.length > 0 ? Number(rows[0].total_count) : 0;
+
+    res.json({
+      data: rows.map((r) => ({
+        controlId: r.control_id,
+        control: r.control,
+        criticalityLabel: r.criticality_label,
+        criticalityValue: r.criticality_value,
+        count: Number(r.count),
+      })),
+      total,
+      page,
+      pageSize,
+    });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 // Executive summary for one report — sections (via raw JOIN), criticality split, and HIGH findings.
 app.get("/api/compliance-reports/:id/executive", async (req: Request, res: Response) => {
   const id = req.params.id;
@@ -629,18 +720,37 @@ app.get("/api/compliance-reports/:id/executive", async (req: Request, res: Respo
       ORDER BY criticality_value DESC
     `;
 
-    // HIGH failed findings grouped by control statement.
-    const highRaw = await prisma.$queryRaw<
-      { control_id: number; control: string; count: bigint }[]
+    // All failed findings grouped by (criticality tier, control) — used for prioritization slides.
+    const prioritizationRaw = await prisma.$queryRaw<
+      { criticality_label: string; criticality_value: number; control_id: number; control: string; count: bigint }[]
     >`
-      SELECT control_id, control, COUNT(*) AS count
+      SELECT criticality_label, criticality_value, control_id, control, COUNT(*) AS count
       FROM compliance_results
-      WHERE report_id = ${id}::uuid AND status = 'Failed' AND criticality_value = 5
-      GROUP BY control_id, control
-      ORDER BY count DESC
+      WHERE report_id = ${id}::uuid AND status = 'Failed' AND criticality_label IS NOT NULL
+      GROUP BY criticality_label, criticality_value, control_id, control
+      ORDER BY criticality_value DESC, count DESC
     `;
 
-    const highTotal = highRaw.reduce((sum, r) => sum + Number(r.count), 0);
+    // Group rows into per-tier buckets (keyed by criticalityValue).
+    type PrioritizationTier = {
+      label: string;
+      value: number;
+      total: number;
+      items: { controlId: number; control: string; count: number }[];
+    };
+    const tierMap = new Map<number, PrioritizationTier>();
+    for (const r of prioritizationRaw) {
+      if (!tierMap.has(r.criticality_value)) {
+        tierMap.set(r.criticality_value, { label: r.criticality_label, value: r.criticality_value, total: 0, items: [] });
+      }
+      const tier = tierMap.get(r.criticality_value)!;
+      tier.items.push({ controlId: r.control_id, control: r.control, count: Number(r.count) });
+      tier.total += Number(r.count);
+    }
+    const prioritization = [...tierMap.values()].sort((a, b) => b.value - a.value);
+
+    // Keep highFindings for backward compat — it's the HIGH tier from prioritization.
+    const highTier = tierMap.get(5);
 
     res.json({
       report: {
@@ -674,16 +784,60 @@ app.get("/api/compliance-reports/:id/executive", async (req: Request, res: Respo
         passed: Number(r.passed),
         failed: Number(r.failed),
       })),
+      prioritization,
       highFindings: {
-        total: highTotal,
-        items: highRaw.map((r) => ({
-          controlId: r.control_id,
-          control: r.control,
-          count: Number(r.count),
-        })),
+        total: highTier?.total ?? 0,
+        items: highTier?.items ?? [],
       },
     });
   } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Export one report as a multi-tab .xlsx workbook (Summary + charts, FirstScan,
+// Priority, _raw, CID). Streams the file to the client — no server-side copy is
+// written (the CLI script in scripts/export-report.ts keeps that dev/review path).
+//   404 if the report doesn't exist; 400 if it has no OS (the section join needs one).
+app.get("/api/compliance-reports/:id/export.xlsx", async (req: Request, res: Response) => {
+  const id = req.params.id;
+  try {
+    // Fetch the name fields up front so the filename is right even on success.
+    const report = await prisma.complianceReport.findUnique({
+      where: { id },
+      select: { fileName: true, title: true, os: true },
+    });
+    if (!report) return res.status(404).json({ error: "Report not found." });
+
+    // buildWorkbook streams the workbook to a temp file (bounded memory, even on
+    // very large reports) and returns its path; we stream it to the client and
+    // delete it afterwards.
+    const tmpPath = await buildWorkbook(prisma, id);
+    const fileName = exportFileName(id, report);
+    const cleanup = () => fs.unlink(tmpPath, () => {});
+
+    const stat = fs.statSync(tmpPath);
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.setHeader("Content-Length", stat.size);
+
+    const stream = fs.createReadStream(tmpPath);
+    stream.on("error", () => {
+      cleanup();
+      if (!res.headersSent) res.status(500).end();
+    });
+    res.on("close", cleanup);
+    stream.pipe(res);
+  } catch (err) {
+    if (err instanceof ReportNotFoundError) {
+      return res.status(404).json({ error: err.message });
+    }
+    if (err instanceof ReportMissingOsError) {
+      return res.status(400).json({ error: err.message });
+    }
     res.status(500).json({ error: (err as Error).message });
   }
 });

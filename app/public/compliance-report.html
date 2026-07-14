@@ -14,6 +14,7 @@
         <h1 id="title">Report</h1>
         <div class="btn-row" style="margin-top:0.5rem;margin-bottom:0">
           <a id="execLink" href="#" class="ghost" style="display:none;text-decoration:none;font-size:0.88rem;padding:0.35rem 0.75rem;border:1px solid var(--border);border-radius:8px;color:var(--text)">Executive view →</a>
+          <a id="exportXlsxLink" href="#" class="ghost" style="display:none;text-decoration:none;font-size:0.88rem;padding:0.35rem 0.75rem;border:1px solid var(--border);border-radius:8px;color:var(--text)">Export to Excel ↓</a>
         </div>
         <dl class="meta" id="meta"></dl>
 
@@ -21,15 +22,50 @@
         <div class="section-title">Summary</div>
         <div class="stats" id="summaryStats"></div>
         <div class="crit-chips" id="failedByCrit"></div>
+        <div class="asset-tags" id="assetTags"></div>
+        <div class="summary-tables" id="summaryTables"></div>
+
+        <!-- Findings by control -->
+        <div class="section-title">Findings by control</div>
+        <div class="toolbar">
+          <input class="search" id="findingSearch" type="text" placeholder="Search control id, control…" />
+          <select id="findingCriticality">
+            <option value="">All criticality</option>
+          </select>
+          <select id="findingPageSize">
+            <option value="5">5 / page</option>
+            <option value="10">10 / page</option>
+            <option value="15">15 / page</option>
+            <option value="20">20 / page</option>
+            <option value="25" selected>25 / page</option>
+            <option value="50">50 / page</option>
+            <option value="100">100 / page</option>
+          </select>
+        </div>
+        <table id="findingsByControl">
+          <thead>
+            <tr><th>Control ID</th><th>Control</th><th>Criticality</th><th>Findings</th></tr>
+          </thead>
+          <tbody id="findingRows"></tbody>
+        </table>
+        <div class="pager">
+          <span id="findingSummary" class="muted"></span>
+          <button class="ghost" id="findingPrev">‹ Prev</button>
+          <button class="ghost" id="findingNext">Next ›</button>
+        </div>
 
         <!-- Host statistics -->
         <div class="section-title">Host statistics</div>
         <div class="toolbar">
           <input class="search" id="hostSearch" type="text" placeholder="Search IP, DNS, OS…" />
           <select id="hostPageSize">
+            <option value="5">5 / page</option>
             <option value="10">10 / page</option>
+            <option value="15">15 / page</option>
             <option value="20" selected>20 / page</option>
+            <option value="25">25 / page</option>
             <option value="50">50 / page</option>
+            <option value="100">100 / page</option>
           </select>
         </div>
         <table>
@@ -57,6 +93,10 @@
             <option value="">All criticality</option>
           </select>
           <select id="pageSize">
+            <option value="5">5 / page</option>
+            <option value="10">10 / page</option>
+            <option value="15">15 / page</option>
+            <option value="20">20 / page</option>
             <option value="25" selected>25 / page</option>
             <option value="50">50 / page</option>
             <option value="100">100 / page</option>
@@ -90,6 +130,7 @@
     <div class="toast" id="toast"></div>
 
     <script src="/scripts/nav.js"></script>
+    <script src="/scripts/asset-tags.js"></script>
     <script src="/scripts/compliance-report.js"></script>
   </body>
 </html>

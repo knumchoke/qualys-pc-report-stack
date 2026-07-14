@@ -12,6 +12,12 @@ let hostPageSize = 20;
 let hostTotal = 0;
 let hostSearchTimer = null;
 
+// Findings-by-control pagination state.
+let findingPage = 1;
+let findingPageSize = 25;
+let findingTotal = 0;
+let findingSearchTimer = null;
+
 function esc(s) {
   return String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
@@ -19,6 +25,7 @@ function fmtDate(s) {
   if (!s) return "—";
   try { return new Date(s).toLocaleString(); } catch { return s; }
 }
+
 function statusBadge(s) {
   const cls = s === "Passed" ? "pass" : s === "Failed" ? "fail" : "neutral";
   return `<span class="badge ${cls}">${esc(s || "—")}</span>`;
@@ -42,6 +49,15 @@ async function loadReport() {
     const el = $("execLink");
     el.href = `/compliance-executive.html?id=${reportId}`;
     el.style.display = "";
+
+    // Export-to-Excel needs an OS too (the section join requires it), so it's
+    // gated the same way — avoids offering a download that would 400.
+    const xl = $("exportXlsxLink");
+    xl.href = `/api/compliance-reports/${reportId}/export.xlsx`;
+    xl.style.display = "";
+
+    // Criticality + section summary tables also need the OS (section mapping).
+    loadSummaryTables();
   }
 
   $("meta").innerHTML = `
@@ -67,13 +83,107 @@ async function loadReport() {
       fbc.map((c) => `<span class="chip">${esc(c.label || "—")} <b>${esc(c.count)}</b></span>`).join("")
     : "";
 
-  // Populate the results criticality filter (labels ordered by severity desc).
+  // Asset tags from the policy summary — blue = included, orange = excluded.
+  $("assetTags").innerHTML = renderAssetTags(s?.assetTags ?? null);
+
+  // Populate criticality filters (results + findings) from the same label list.
+  const labels = r.criticalityLabels || [];
+  const optionsHtml = labels.map((l) => `<option value="${esc(l)}">${esc(l)}</option>`).join("");
+
   const sel = $("criticality");
   const current = sel.value;
-  sel.innerHTML =
-    '<option value="">All criticality</option>' +
-    (r.criticalityLabels || []).map((l) => `<option value="${esc(l)}">${esc(l)}</option>`).join("");
+  sel.innerHTML = '<option value="">All criticality</option>' + optionsHtml;
   sel.value = current;
+
+  const fsel = $("findingCriticality");
+  const fcurrent = fsel.value;
+  fsel.innerHTML = '<option value="">All criticality</option>' + optionsHtml;
+  fsel.value = fcurrent;
+}
+
+// Criticality (Mandatory/Optional) + per-section summary tables — same data as
+// the Excel export, sourced from the executive endpoint. Skips silently if the
+// report has no OS (the section mapping needs it).
+async function loadSummaryTables() {
+  const res = await fetch(`/api/compliance-reports/${reportId}/executive`);
+  if (!res.ok) return;
+  const d = await res.json();
+  const crit = d.criticality || [];
+  const sections = d.sections || [];
+  const overall = d.overall || {};
+  const n = (v) => Number(v || 0).toLocaleString();
+  const sum = (arr, k) => arr.reduce((a, c) => a + (c[k] || 0), 0);
+
+  // Mandatory = HIGH + MEDIUM (criticalityValue >= 4); Optional = the rest.
+  const mand = crit.filter((c) => c.value >= 4);
+  const opt = crit.filter((c) => c.value < 4);
+  const critTable = `
+    <table>
+      <thead><tr><th>Control Criticality</th><th class="num">Passed</th><th class="num">Failed</th></tr></thead>
+      <tbody>
+        <tr><td>Mandatory</td><td class="num">${n(sum(mand, "passed"))}</td><td class="num">${n(sum(mand, "failed"))}</td></tr>
+        <tr><td>Optional</td><td class="num">${n(sum(opt, "passed"))}</td><td class="num">${n(sum(opt, "failed"))}</td></tr>
+      </tbody>
+    </table>`;
+
+  const totPassed = overall.passed ?? sum(sections, "passed");
+  const totFailed = overall.failed ?? sum(sections, "failed");
+  const grand = totPassed + totFailed;
+  const passPct = overall.passedPct != null ? overall.passedPct : grand ? (totPassed / grand) * 100 : 0;
+  const failPct = overall.failedPct != null ? overall.failedPct : grand ? (totFailed / grand) * 100 : 0;
+  const secTable = `
+    <table>
+      <thead><tr><th>Section Name</th><th class="num">Passed</th><th class="num">Failed</th><th class="num">Total</th></tr></thead>
+      <tbody>
+        ${sections
+          .map(
+            (s) => `<tr><td>${esc(s.sectionName)}</td><td class="num">${n(s.passed)}</td><td class="num">${n(s.failed)}</td><td class="num">${n(s.total)}</td></tr>`,
+          )
+          .join("")}
+      </tbody>
+      <tfoot>
+        <tr><td>Total</td><td class="num">${n(totPassed)}</td><td class="num">${n(totFailed)}</td><td class="num">${n(grand)}</td></tr>
+        <tr class="pct"><td>% pass / failed</td><td class="num">${Number(passPct).toFixed(1)}%</td><td class="num">${Number(failPct).toFixed(1)}%</td><td class="num"></td></tr>
+      </tfoot>
+    </table>`;
+
+  $("summaryTables").innerHTML = critTable + secTable;
+}
+
+async function loadFindings() {
+  findingPageSize = Number($("findingPageSize").value);
+  const params = new URLSearchParams({
+    page: findingPage,
+    pageSize: findingPageSize,
+    criticality: $("findingCriticality").value,
+    q: $("findingSearch").value.trim(),
+  });
+  const res = await fetch(`/api/compliance-reports/${reportId}/findings-by-control?` + params.toString());
+  if (!res.ok) return;
+  const json = await res.json();
+  findingTotal = json.total ?? 0;
+  const data = json.data || [];
+
+  $("findingRows").innerHTML = data.length
+    ? data
+        .map(
+          (r) => `
+      <tr>
+        <td>${esc(r.controlId ?? "—")}</td>
+        <td>${esc(r.control || "—")}</td>
+        <td class="muted">${esc(r.criticalityLabel || "—")}</td>
+        <td><b>${Number(r.count).toLocaleString()}</b></td>
+      </tr>`,
+        )
+        .join("")
+    : '<tr><td class="empty" colspan="4">No findings.</td></tr>';
+
+  const pages = Math.max(1, Math.ceil(findingTotal / findingPageSize));
+  const from = findingTotal === 0 ? 0 : (findingPage - 1) * findingPageSize + 1;
+  const to = Math.min(findingPage * findingPageSize, findingTotal);
+  $("findingSummary").textContent = `${from}–${to} of ${findingTotal}`;
+  $("findingPrev").disabled = findingPage <= 1;
+  $("findingNext").disabled = findingPage >= pages;
 }
 
 async function loadHosts() {
@@ -193,6 +303,16 @@ $("hostPageSize").addEventListener("change", () => { hostPage = 1; loadHosts(); 
 $("hostPrev").addEventListener("click", () => { if (hostPage > 1) { hostPage--; loadHosts(); } });
 $("hostNext").addEventListener("click", () => { hostPage++; loadHosts(); });
 
+$("findingSearch").addEventListener("input", () => {
+  clearTimeout(findingSearchTimer);
+  findingSearchTimer = setTimeout(() => { findingPage = 1; loadFindings(); }, 300);
+});
+$("findingCriticality").addEventListener("change", () => { findingPage = 1; loadFindings(); });
+$("findingPageSize").addEventListener("change", () => { findingPage = 1; loadFindings(); });
+$("findingPrev").addEventListener("click", () => { if (findingPage > 1) { findingPage--; loadFindings(); } });
+$("findingNext").addEventListener("click", () => { findingPage++; loadFindings(); });
+
 loadReport();
+loadFindings();
 loadHosts();
 loadResults();
